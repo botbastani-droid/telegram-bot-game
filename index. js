@@ -1,0 +1,85 @@
+const TelegramBot = require('node-telegram-bot-api');
+
+const token = process.env.TOKEN;
+const bot = new TelegramBot(token, { polling: true });
+
+// ذخیره عدد هر کاربر
+const userGames = {};
+
+// دستور start
+bot.onText(/\/start/, (msg) => {
+  const chatId = msg.chat.id;
+  const userId = msg.from.id;
+  
+  const randomNumber = Math.floor(Math.random() * 20) + 1;
+  userGames[userId] = randomNumber;
+  
+  bot.sendMessage(chatId, 
+    `🎲 به بازی حدس عدد خوش اومدی!\n\n` +
+    `یه عدد بین 1 تا 20 انتخاب کردم.\n` +
+    `عدد مورد نظر رو برام بفرست.`,
+    {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '🔄 بازی جدید', callback_data: 'new_game' }]
+        ]
+      }
+    }
+  );
+});
+
+// هندلر پیام‌های متنی (حدس عدد)
+bot.on('message', (msg) => {
+  const chatId = msg.chat.id;
+  const userId = msg.from.id;
+  const text = msg.text;
+  
+  if (text.startsWith('/')) return;
+  
+  if (!userGames[userId]) {
+    bot.sendMessage(chatId, '⚠️ اول /start رو بزن.');
+    return;
+  }
+  
+  const number = parseInt(text);
+  if (isNaN(number)) {
+    bot.sendMessage(chatId, '❌ لطفاً فقط یک عدد وارد کن!');
+    return;
+  }
+  
+  const secret = userGames[userId];
+  
+  if (number < secret) {
+    bot.sendMessage(chatId, '📈 برو بالاتر! عدد بزرگتر بزن.');
+  } else if (number > secret) {
+    bot.sendMessage(chatId, '📉 برو پایین‌تر! عدد کوچکتر بزن.');
+  } else {
+    bot.sendMessage(chatId, 
+      `🎉 آفرین! درست بود! عدد ${secret} بود.\n\nبرای بازی جدید دکمه زیر رو بزن.`,
+      {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '🎮 بازی جدید', callback_data: 'new_game' }]
+          ]
+        }
+      }
+    );
+    delete userGames[userId];
+  }
+});
+
+// هندلر دکمه‌ها
+bot.on('callback_query', (query) => {
+  const chatId = query.message.chat.id;
+  const userId = query.from.id;
+  
+  if (query.data === 'new_game') {
+    const newNumber = Math.floor(Math.random() * 20) + 1;
+    userGames[userId] = newNumber;
+    
+    bot.sendMessage(chatId, '🔄 بازی جدید شروع شد!\n\nیه عدد بین 1 تا 20 رو بفرست.');
+    bot.answerCallbackQuery(query.id);
+  }
+});
+
+console.log('✅ ربات روشن شد...');
